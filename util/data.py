@@ -38,35 +38,12 @@ def fetch_sample_data(
 
 
 def transform_df(df: pd.DataFrame) -> pd.DataFrame:
-    # Indicator variable to capture when pdays takes a value of 999
-    df["no_previous_contact"] = np.where(df["pdays"] == 999, 1, 0)
-
-    # Indicator for individuals not actively employed
-    df["not_working"] = np.where(
-        np.in1d(df["job"], ["student", "retired", "unemployed"]), 1, 0
-    )
-
-    # df = pd.get_dummies(df)  # Convert categorical variables to sets of indicators
-
-    # Replace "y_no" and "y_yes" with a single label column, and bring it to the front:
-    # df_model_data = pd.concat(
-    #     [
-    #         df_model_data["y_yes"].rename("y"),
-    #         df_model_data.drop(["y_no", "y_yes"], axis=1),
-    #     ],
-    #     axis=1,
-    # )
-    
-    # Encode 'y' to numeric so AutoGluon-Tabular predictions can be mapped to labels:
-    assert "yes" in df["y"].unique(), "Expected 'y' column to contain 'yes' and 'no'"
-    df["y"] = df["y"].apply(lambda y: int(y == "yes"))
-
-    # Move 'y' to front:
-    df = df.loc[:, ["y"] + [col for col in df.columns if col != "y"]]
+    # Move 'Survived' to front:
+    df = df.loc[:, ["Survived"] + [col for col in df.columns if col != "Survived"]]
 
     # Add record identifier and event timestamp fields required for SageMaker Feature Store:
-    df["customer_id"] = df.index.to_series().apply(lambda num: f"C-{num:08}")
-    df["event_time"] = (pd.Timestamp.utcnow() - pd.DateOffset(years=1)).timestamp()
+    df["PassengerID"] = df.index.to_series().apply(lambda num: f"C-{num:08}")
+    df["EventTime"] = (pd.Timestamp.utcnow() - pd.DateOffset(years=1)).timestamp()
 
     return df
 
@@ -75,96 +52,38 @@ def load_sample_data(
     raw_file_path: str,
     fg_s3_uri: str,
     ignore_cols: Iterable[str] = (
-        "duration", "emp.var.rate", "cons.price.idx", "cons.conf.idx", "euribor3m", "nr.employed"
+        "PassengerId"
     ),
     transform_fn: Callable[[pd.DataFrame], pd.DataFrame] = transform_df,
-    feature_group_name: str = "sm101-direct-marketing",
+    feature_group_name: str = "awscc-sm-titanic",
     feature_group_description: str = (
-        "Demo Bank Marketing dataset for 'SageMaker 101' workshop, based on "
-        "http://archive.ics.uci.edu/ml/datasets/Bank+Marketing"
-        # "Demo Bank marketing dataset for 'SageMaker 101' introductory workshop.\n\n"
-        # "This is a transformed version of the 'Bank Marketing' UCI dataset for research. Please "
-        # "cite: S. Moro, P. Cortez and P. Rita. A Data-Driven Approach to Predict the Success of "
-        # "Bank Telemarketing. Decision Support Systems, In press, "
-        # "http://dx.doi.org/10.1016/j.dss.2014.03.001\n\n"
-        # "Data description at: http://archive.ics.uci.edu/ml/datasets/Bank+Marketing"
+        "Titanic passenger dataset"
+        "https://www.kaggle.com/datasets/shubhamgupta012/titanic-dataset"
     ),
     feature_descriptions: Dict[str, str] = {
-        "customer_id": (
-            "Unique customer identifier (dummy added for purpose of SageMaker Feature Store)"
+        "PassengerID": (
+            "Unique passenger identifier (dummy added for purpose of SageMaker Feature Store)"
         ),
-        "event_time": "Event/update timestamp (dummy added for purpose of SageMaker Feature Store)",
-        "y": (
-            "Has the client subscribed a term deposit? (binary: 0/1). This is the target variable "
-            "for our direct marketing example."
-        ),
-        ## Bank client data:
-        "age": "Client's age in years",
-        "job": (
-            'Type of job (categorical: "admin.","blue-collar","entrepreneur","housemaid",'
-            '"management","retired","self-employed","services","student","technician","unemployed",'
-            '"unknown")'
-        ),
-        "marital": (
-            'Marital status (categorical: "divorced","married","single","unknown"; note: '
-            '"divorced" means divorced or widowed)'
-        ),
-        "education": (
-            'Highest education (categorical: "basic.4y","basic.6y","basic.9y","high.school",'
-            '"illiterate","professional.course","university.degree","unknown")'
-        ),
-        "default": 'Has credit in default? (categorical: "no","yes","unknown")',
-        "housing": 'Has housing loan? (categorical: "no","yes","unknown")',
-        "loan": 'Has personal loan? (categorical: "no","yes","unknown")',
-        ## Related with last contact of current campaign:
-        "contact": 'Contact communication type (categorical: "cellular","telephone")',
-        "day_of_week": 'Last contact day of the week (categorical: "mon","tue","wed","thu","fri")',
-        # "duration": (
-        #     'Last contact duration, in seconds (numeric). Important note:  this attribute highly '
-        #     'affects the output target (e.g., if duration=0 then y="no"). Yet, the duration is not '
-        #     'known before a call is performed. Also, after the end of the call y is obviously '
-        #     'known. Thus, this input should only be included for benchmark purposes and should be '
-        #     'discarded if the intention is to have a realistic predictive model.'
-        # ),
-        ## Other attributes:
-        "campaign": (
-            "Number of contacts performed during this campaign and for this client (numeric, "
-            "includes last contact)"
-        ),
-        "pdays": (
-            "Number of days that passed by after the client was last contacted from a previous "
-            "campaign (numeric; 999 means client was not previously contacted)"
-        ),
-        "previous": (
-            "Number of contacts performed before this campaign and for this client (numeric)"
-        ),
-        "poutcome": (
-            'Outcome of the previous marketing campaign (categorical: "failure","nonexistent",'
-            '"success")'
-        ),
-        ## Social and economic context attributes:
-        # "emp.var.rate": "Employment variation rate - quarterly indicator (numeric)",
-        # "cons.price.idx": "Consumer price index - monthly indicator (numeric)",
-        # "cons.conf.idx": "Consumer confidence index - monthly indicator (numeric)",
-        # "euribor3m": "EURIBOR 3 month rate - daily indicator (numeric)",
-        # "nr.employed": "Number of employees - quarterly indicator (numeric)",
-        ## Synthetics from transform_fn:
-        "no_previous_contact": (
-            "Boolean indicator for clients not previously contacted (pdays=999)"
-        ),
-        "not_working": "Boolean indicator for individuals not actively employed",
+        "EventTime": "Event/update timestamp (dummy added for purpose of SageMaker Feature Store)",
+        "Survived": "Survival status of the passenger (0 = Not Survived, 1 = Survived)",
+        "Pclass": "Passenger class (1 = First class, 2 = Second class, 3 = Third class)",
+        "Sex": "Gender of the passenger",
+        "Age": "Age of the passenger",
+        "SibSp": "Number of siblings/spouses aboard the Titanic",
+        "Parch": "Number of parents/children aboard the Titanic",
+        "Fare": "Fare paid by the passenger",
+        "Embarked": " Port of embarkation (0 = Cherbourg, 1 = Queenstown, 2 = Southampton)"
     },
     feature_parameters: Dict[str, Dict[str, str]] = {
         "Source": {
-            "bank-client": ["age", "job", "marital", "education", "default", "housing", "loan"],
-            "last-contact": ["contact", "day_of_week"],
-            "other": ["campaign", "pdays", "previous", "poutcome"],
-            "subscriptions": ["y"],
-            "transforms": ["no_previous_contact", "not_working"],
+            "passenger": ["Sex", "Age"],
+            "relations": ["SibSp", "Parch"],
+            "p_trip_details": ["Fare", "Pclass", "Embarked"],
+            "survived": ["Survived"],
         },
     },
-    fg_record_identifier_field: str = "customer_id",
-    fg_event_timestamp_field: str = "event_time",
+    fg_record_identifier_field: str = "PassengerID",
+    fg_event_timestamp_field: str = "EventTime",
     sagemaker_session: Optional[sagemaker.Session] = None,
 ) -> None:
     print(f"Loading {raw_file_path}...")
