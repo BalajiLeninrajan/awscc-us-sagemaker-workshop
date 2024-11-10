@@ -15,28 +15,6 @@ from sagemaker.feature_store.feature_definition import FeatureDefinition
 from sagemaker.feature_store.feature_group import FeatureGroup, FeatureParameter
 
 
-def fetch_sample_data(
-    zip_url: str = "https://sagemaker-sample-data-us-west-2.s3-us-west-2.amazonaws.com/autopilot/direct_marketing/bank-additional.zip",
-    local_folder: str = "data",
-    target_file: str = "bank-additional/bank-additional-full.csv",
-) -> str:
-    """Fetch the raw sample dataset, download and extract it locally, and return the local file path
-    """
-    target_file_path = os.path.join(local_folder, target_file)
-
-    if os.path.isdir(local_folder) and os.path.isfile(target_file_path):
-        print(f"Skipping download - file already exists {target_file_path}")
-    else:
-        print(f"Downloading zip data...\n{zip_url}")
-        with urlopen(zip_url) as resp:
-            with ZipFile(BytesIO(resp.read())) as zip_file:
-                print(f"Extracting to {local_folder}...")
-                zip_file.extractall(local_folder)
-
-    return target_file_path
-    
-
-
 def transform_df(df: pd.DataFrame) -> pd.DataFrame:
     # Move 'Survived' to front:
     df = df.loc[:, ["Survived"] + [col for col in df.columns if col != "Survived"]]
